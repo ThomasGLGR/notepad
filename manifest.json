@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Notepad++++ SOC Capture",
+  "version": "1.4.0",
+  "description": "Send selected text, clipboard text or local JSON exports to the SOC investigation workspace.",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "clipboardRead",
+    "clipboardWrite",
+    "offscreen"
+  ],
+  "background": {
+    "service_worker": "extension/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://CHANGEME/*"
+      ],
+      "js": [
+        "extension/json-receiver.js",
+        "extension/json-receiver-start.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "Open SOC Note Builder",
+    "default_icon": "favicon.ico"
+  },
+  "commands": {
+    "capture-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+X",
+        "mac": "Command+Shift+X"
+      },
+      "description": "Send selected text to Note Builder and copy it to the clipboard"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-hashes' 'sha256-Ol2CgiiSUsvoGMDloJs4NChCXdemPypIzrw7YS2IYKw='; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+  }
+}

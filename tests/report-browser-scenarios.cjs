@@ -1,0 +1,92 @@
+const assert = require('node:assert/strict');
+module.exports = async function reportChecks({evaluate, command, click, fill, wait, ready, keypress}) {
+  await click('#new-button');
+  await evaluate('window.nativeClipboard = navigator.clipboard');
+  assert.equal(await evaluate('document.documentElement.lang'),'en');
+  assert.equal(await evaluate('document.getElementById("summary-heading").textContent'),'Summary');
+  assert.equal(await evaluate('document.getElementById("report-heading").textContent'),'Report');
+  await fill('#raw-input','USER: DOMAIN\\jdupont\nHOST: PC-0042\nIP: 185.42.21.8');
+  await click('#process-source-button');
+  await evaluate('SOCNote.remediation.setActiveTactics(["credential-access"])');
+  await click('[data-tactic-group=credential-access] [data-choose=credential-access-1]');
+  await fill('#analysis-input','Sign-ins reviewed.');
+  // Remediation and Recommendations are withdrawn from the page and from the report.
+  assert.equal(await evaluate('document.getElementById("remediation-panel").hidden'),true);
+  assert.equal(await evaluate('document.querySelector(".recommendations-pane").getBoundingClientRect().height'),0);
+  assert(!(await evaluate('SOCNote.report.getText()')).includes('REMEDIATION'));
+  // Literal separators surround centered headings on a white report.
+  const rules=()=>evaluate('Array.from(document.querySelectorAll("#final-report-input .report-separator"),node=>node.textContent)');
+  assert.deepEqual(await rules(),Array(4).fill('=================================================='));
+  await evaluate('document.getElementById("mitre-input").focus()');
+  await fill('#mitre-input','T1078');
+  await keypress('Enter','Enter',0,13);
+  await fill('#rule-input','Suspicious sign-in');
+  const titled=await evaluate('SOCNote.report.getText()');
+  assert(titled.startsWith('Suspicious sign-in\n\n==================================================\n                     SUMMARY\n==================================================\n\nMITRE ATT&CK:'),'Blank lines follow the title and Summary banner');
+  assert.equal(await evaluate('document.getElementById("final-report-input").textContent'),titled,'The preview keeps exactly the same blank lines');
+  await click('#copy-report-button');
+  await wait(60);
+  assert.equal(await evaluate('nativeClipboard.readText()'),titled,'Copy report keeps both new blank lines');
+  const titledHTML=await evaluate('SOCNote.report.getHTML()');
+  assert(titledHTML.includes('<strong>Suspicious sign-in</strong><br><br>=================================================='));
+  assert(titledHTML.includes('==================================================<br><br><strong>MITRE ATT&amp;CK</strong>'));
+  assert.equal((await rules()).length,4,'Summary and Analysis each have two separator lines');
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("#final-report-input h3, #final-report-input h4"),node=>node.textContent.trim())'),['Suspicious sign-in','SUMMARY','ANALYSIS']);
+  const look=selector=>evaluate(`(()=>{const style=getComputedStyle(document.querySelector(${JSON.stringify(selector)}));return {background:style.backgroundColor,border:style.borderTopWidth,color:style.color};})()`);
+  assert.equal((await look('#final-report-input')).background,'rgb(255, 255, 255)');
+  assert.equal((await look('#final-report-input')).border,'0px','No card inside the Report card');
+  assert.equal((await look('#final-report-input .report-summary')).background,'rgba(0, 0, 0, 0)');
+  assert.equal((await look('#final-report-input .report-text')).background,'rgba(0, 0, 0, 0)','Analysis has no fill');
+  assert.equal((await look('#final-report-input h4')).color,'rgb(37, 43, 51)');
+  assert((await evaluate('SOCNote.report.getText()')).includes('=================================================='));
+  assert.equal(await evaluate('Array.from(document.querySelectorAll("#final-report-input, #final-report-input h3, #final-report-input h4, #final-report-input .report-detail"),node=>getComputedStyle(node).fontSize).every(size=>size==="14px")'),true);
+  // MITRE references open the Summary; each ID links to its official page.
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("#final-report-input .report-mitre a"),node=>[node.textContent,node.href,node.target,node.rel])'),[['T1078','https://attack.mitre.org/techniques/T1078/','_blank','noopener noreferrer']]);
+  assert.equal(await evaluate('Array.from(document.querySelectorAll("#final-report-input strong"),node=>node.textContent).join(",")'),'MITRE ATT&CK,USER,HOST,IP');
+  await fill('#rule-input','');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector("#final-report-input strong")).fontWeight'),'700');
+  await click('#copy-report-button');
+  await wait(60);
+  const markdown=await evaluate('nativeClipboard.readText()');
+  assert.equal(markdown,await evaluate('SOCNote.report.getText()'));
+  assert.equal(markdown,await evaluate('document.getElementById("final-report-input").textContent'));
+  assert(markdown.includes('USER: DOMAIN\\jdupont'));
+  assert.equal(markdown,'==================================================\n                     SUMMARY\n==================================================\n\nMITRE ATT&CK: Valid Accounts (T1078)\n\nUSER: DOMAIN\\jdupont\n\nHOST: PC-0042\n\nIP: 185.42.21.8 → VirusTotal\n\n==================================================\n                     ANALYSIS\n==================================================\n\nSign-ins reviewed.');
+  const html=await evaluate('(async()=>{const items=await nativeClipboard.read();for(const item of items)if(item.types.includes("text/html"))return await(await item.getType("text/html")).text();return null;})()');
+  assert(html,'Rich-text copy includes HTML');
+  assert(html.includes('<strong>USER</strong>'));
+  assert(html.replace(/&nbsp;|\u00a0/g,' ').includes('<strong>MITRE ATT&amp;CK</strong>: Valid Accounts (<a href="https://attack.mitre.org/techniques/T1078/">T1078</a>)<br><br><strong>USER</strong>: DOMAIN'));
+  assert(html.includes('==================================================') && !html.includes('<hr'));
+  assert(html.includes('font-size: 14px') && html.includes('font-family: monospace'));
+
+  // Keys and values are inert text in the bold preview and rich clipboard output.
+  const attack='<img src="https://example.invalid/exfil" onerror="window.compromised=1">';
+  const firstId=await evaluate('document.querySelector("#report-input [data-variable-id]").dataset.variableId');
+  await fill('[data-variable-key="'+firstId+'"]','<svg onload=alert(1)>');
+  await fill('[data-variable-value="'+firstId+'"]',attack);
+  assert.equal(await evaluate('document.querySelectorAll("#final-report-input img, #final-report-input svg").length'),0);
+  assert.equal(await evaluate('document.querySelector("#final-report-input .report-field:not(.report-mitre) strong").textContent'),'<svg onload=alert(1)>');
+  assert.equal(await evaluate('window.compromised || null'),null);
+  const serialized=await evaluate('SOCNote.report.getHTML()');
+  assert(!serialized.includes('<img src='));
+  assert(!serialized.includes('<svg onload='));
+  assert(serialized.includes('&lt;img'));
+  await click('#copy-report-button');
+  await wait(60);
+  assert.equal(await evaluate('nativeClipboard.readText()'),await evaluate('SOCNote.report.getText()'));
+
+  // Old untouched defaults migrate when loaded, retaining their enabled/favorite settings.
+  await click('#new-button');
+  await evaluate('(() => {const catalog=SOCNote.remediationData.defaults();const item=catalog.find(tactic=>tactic.id==="credential-access").remediations[0];item.template="Réinitialiser le mot de passe du compte {USER}.";item.favorite=true;SOCNote.remediationStorage.setEnabled(true,catalog);})()');
+  await command('Page.reload');
+  await ready();
+  await evaluate('window.nativeClipboard = navigator.clipboard');
+  assert.equal(await evaluate('document.querySelector("#remediation-persist")'),null);
+  assert((await evaluate('document.getElementById("remediation-recommendations").textContent')).includes('Reset the password for the account under investigation.'));
+  assert(!(await evaluate('document.getElementById("remediation-recommendations").textContent')).includes('Réinitialiser'));
+  await evaluate('SOCNote.remediationStorage.setEnabled(false,SOCNote.remediationData.defaults())');
+  await command('Page.reload');
+  await ready();
+  await click('#new-button');
+  console.log('Report checks passed: 14 px report, white sections, literal separators and centered headings, MITRE links, matching plain/rich copies, inert values and saved defaults.');
+};

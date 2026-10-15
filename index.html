@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <!-- Allow only the fixed 14 px report clipboard style as an inline attribute. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-hashes' 'sha256-Ol2CgiiSUsvoGMDloJs4NChCXdemPypIzrw7YS2IYKw='; img-src 'self' data:; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Notepad++++</title>
+  <link rel="icon" type="image/png" href="favicon.ico">
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="js/templates.js"></script>
+  <script defer src="js/clean.js"></script>
+  <script defer src="js/country.js"></script>
+  <script defer src="js/entities.js"></script>
+  <script defer src="js/summary-data.js"></script>
+  <script defer src="js/json-import.js"></script>
+  <script defer src="extension/capture-data.js"></script>
+  <script defer src="js/extractors.js"></script>
+  <script defer src="js/parser.js"></script>
+  <script defer src="js/defang.js"></script>
+  <script defer src="js/remediation-data.js"></script>
+  <script defer src="js/remediation-engine.js"></script>
+  <script defer src="js/remediation-storage.js"></script>
+  <script defer src="js/remediation-ui.js"></script>
+  <script defer src="js/mitre-data.js"></script>
+  <script defer src="js/mitre-ui.js"></script>
+  <script defer src="js/formatter.js"></script>
+  <script defer src="js/storage.js"></script>
+  <script defer src="js/summary-editor.js"></script>
+  <script defer src="js/clipboard.js"></script>
+  <script defer src="js/report-ui.js"></script>
+  <script defer src="js/extension-bridge.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="app-title"><img class="app-logo" src="favicon.ico" alt="" width="34" height="28">Notepad++++</h1>
+    <div class="toolbar">
+      <button id="undo-button" class="button-quiet" type="button" disabled title="Undo">Undo</button>
+      <button id="new-button" class="button-primary" type="button" title="New investigation" aria-label="New investigation">New</button>
+    </div>
+  </header>
+  <div class="rule-bar">
+    <div class="rule-field">
+      <label for="rule-input">Rule</label>
+      <input id="rule-input" type="text" placeholder="Rule name" autocomplete="off" spellcheck="false" maxlength="2000">
+    </div>
+    <div class="mitre-field">
+      <label for="mitre-input">MITRE ATT&amp;CK</label>
+      <div class="mitre-picker">
+        <span id="mitre-selected" class="mitre-selected" role="list" aria-label="Selected MITRE ATT&amp;CK techniques"></span>
+        <input id="mitre-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mitre-options" placeholder="T1059, TA0006, PowerShell…" autocomplete="off" spellcheck="false" maxlength="500">
+        <ul id="mitre-options" class="mitre-options" role="listbox" aria-label="MITRE ATT&amp;CK techniques" hidden></ul>
+      </div>
+      <button id="mitre-tactics-button" type="button" aria-expanded="false" aria-controls="mitre-tactics" title="Choose MITRE ATT&amp;CK tactics">Tactics</button>
+      <div id="mitre-tactics" class="mitre-tactics" role="group" aria-label="MITRE ATT&amp;CK tactics" hidden></div>
+    </div>
+  </div>
+  <main class="workspace">
+    <section class="source-pane workspace-card" aria-labelledby="source-heading">
+      <div class="pane-heading"><h2 id="source-heading">Logs</h2><div class="pane-actions"><button id="open-log-button" class="button-quiet" type="button" title="Open log file" aria-label="Open log file">Open</button><button id="process-source-button" class="button-primary" type="button" title="Add logs to Summary (Ctrl+Enter)" aria-keyshortcuts="Control+Enter">Add to summary</button></div></div>
+      <label class="sr-only" for="raw-input">Enter logs or key-value pairs</label>
+      <textarea id="raw-input" class="raw-input" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste logs" aria-describedby="raw-help"></textarea>
+      <span id="raw-help" class="sr-only">key: value, key = value, or JSON objects</span>
+      <div class="source-info"><span id="source-filename" hidden></span></div>
+      <input id="log-file-input" type="file" accept="text/*,.log,.json,.csv" hidden>
+      <p id="source-status" class="status" role="status" hidden></p>
+    </section>
+    <section class="synthesis-pane workspace-card" aria-labelledby="summary-heading">
+      <div class="pane-heading"><h2 id="summary-heading">Summary</h2><div class="pane-actions"><button id="add-variable-button" type="button">+ Category</button><button id="copy-summary-button" class="button-quiet" type="button">Copy values</button></div></div>
+      <div class="summary-editor-shell">
+        <div id="report-input" class="summary-pairs" role="list" aria-label="Summary categories and subcategories" tabindex="0"></div>
+      </div>
+      <form id="summary-add-variable-form" class="summary-add-variable-form" hidden>
+        <label for="summary-new-key">Title<input id="summary-new-key" type="text" maxlength="300" required autocomplete="off"></label>
+        <label for="summary-new-value">Value<input id="summary-new-value" maxlength="10000" type="text" required autocomplete="off"></label>
+        <div class="remediation-actions"><button type="submit">Add</button><button id="summary-cancel-variable" class="button-quiet" type="button">Cancel</button></div>
+      </form>
+      <span id="summary-drop-status" class="sr-only" role="status" aria-live="polite"></span>
+    </section>
+    <section class="analysis-pane workspace-card" aria-labelledby="analysis-heading">
+      <div class="pane-heading"><h2 id="analysis-heading">Analysis</h2><button id="copy-analysis-button" class="button-quiet" type="button" aria-label="Copy analysis">Copy</button></div>
+      <label class="sr-only" for="analysis-input">Investigation analysis</label><textarea id="analysis-input" spellcheck="false" placeholder="Notes"></textarea>
+    </section>
+      <section id="remediation-panel" class="remediation-panel" aria-labelledby="remediation-heading" hidden>
+        <div class="remediation-selected-pane workspace-card">
+        <div class="remediation-toolbar"><h2 id="remediation-heading">Remediation</h2><button id="copy-remediations-button" class="button-quiet" type="button" disabled title="Copy selected remediations" aria-label="Copy selected remediations">Copy</button></div>
+        <div class="remediation-scroll">
+          <div class="remediation-filters">
+            <label for="remediation-tactic">MITRE tactic<select id="remediation-tactic"><option value="">Choose a tactic</option></select></label>
+            <label for="remediation-search">Search<input id="remediation-search" type="search" placeholder="Actions" autocomplete="off"></label>
+          </div>
+          <div id="remediation-active-tactics" class="remediation-active-tactics" aria-label="Active tactics"></div>
+          <div class="remediation-catalog-tools"><button id="add-remediation-button" type="button">+ Action</button></div>
+          <form id="remediation-edit-form" class="remediation-inline-form" hidden>
+            <h3 id="remediation-edit-heading">Template</h3>
+            <label for="remediation-edit-tactic">Tactic<select id="remediation-edit-tactic" required></select></label>
+            <label for="remediation-edit-template">Text<textarea id="remediation-edit-template" rows="2" required maxlength="10000"></textarea></label>
+            <details class="template-variables"><summary>Variables</summary><p class="remediation-help">{USER} · {HOST} · {IP} · {SRC_IP} · {DST_IP} · {DOMAIN} · {URL} · {HASH} · {FILE} · {PROCESS}</p></details>
+            <label for="remediation-edit-generic"><span>Fallback text <span class="field-optional">Optional</span></span><input id="remediation-edit-generic" type="text" maxlength="10000"></label>
+            <p id="remediation-model-help" class="remediation-help" hidden>Updates the catalogue. Check values before saving.</p>
+            <div class="remediation-actions"><button type="submit">Save</button><button id="remediation-cancel-edit" class="button-quiet" type="button">Cancel</button></div>
+          </form>
+          <div class="remediation-selected-heading" aria-hidden="true"></div>
+          <div id="remediation-selected"></div>
+
+        </div>
+        </div>
+        <div class="recommendations-pane workspace-card" aria-labelledby="recommendations-heading">
+          <div class="pane-heading"><h2 id="recommendations-heading">Recommendations</h2></div>
+          <div class="recommendations-scroll"><div id="remediation-recommendations" aria-label="Available recommendations"></div></div>
+        </div>
+      </section>
+    <section class="report-pane workspace-card" aria-labelledby="report-heading">
+      <div class="pane-heading"><h2 id="report-heading">Report</h2><div class="report-actions"><button id="copy-report-button" class="button-primary" type="button" disabled>Copy report</button></div></div>
+      <div id="final-report-input" class="final-report-preview" tabindex="0" role="region" aria-label="Full investigation report"></div>
+    </section>
+  </main>
+  <p id="draft-error" class="draft-error" role="status" hidden></p>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="copy-dialog" aria-labelledby="copy-heading"><div class="dialog-heading"><h2 id="copy-heading">Copy</h2><button id="close-copy-button" class="button-quiet" type="button">Close</button></div><p>Press Ctrl / ⌘ + C.</p><label class="sr-only" for="manual-copy-input">Text to copy</label><textarea id="manual-copy-input" readonly spellcheck="false"></textarea></dialog>
+  <noscript>Enable JavaScript to use this application.</noscript>
+</body>
+</html>
